@@ -23,8 +23,8 @@ class Snapshot:
     _objects: Dict[str, Matrix]
 
     _storage = [
-        (np.ndarray, np.save, np.load, '.npy'),
-        (sp.spmatrix, sp.save_npz, sp.load_npz, '.npz'),
+        (np.ndarray, np.save, np.load, '.npy', {"allow_pickle": False}),
+        (sp.spmatrix, sp.save_npz, sp.load_npz, '.npz', {}),
     ]
 
     def __init__(self, root: Path, data: Optional[np.ndarray] = None, **kwargs: Matrix):
@@ -49,7 +49,7 @@ class Snapshot:
 
     def existing_objpath(self, name: str) -> Optional[Path]:
         rpath = self.objpath_root(name)
-        for (_, _, _, suffix) in self._storage:
+        for (_, _, _, suffix, _) in self._storage:
             if (path := rpath.with_suffix(suffix)).exists():
                 return path
         return None
@@ -58,25 +58,25 @@ class Snapshot:
         if (path := self.existing_objpath(name)) is not None:
             path.unlink()
         obj = self._objects[name]
-        for (cls, saver, _, suffix) in self._storage:
+        for (cls, saver, _, suffix, kwargs) in self._storage:
             if isinstance(obj, cls):
-                saver(self.objpath_root(name).with_suffix(suffix), obj)
+                saver(self.objpath_root(name).with_suffix(suffix), obj, **kwargs)
 
     def save_data(self):
         if (path := self.datapath).exists():
             path.unlink()
         if self._data is None:
             return
-        np.save(self.datapath, self._data)
+        np.save(self.datapath, self._data, allow_pickle=False)
 
     def __getitem__(self, name: str) -> Matrix:
         if name not in self._objects:
             path = self.existing_objpath(name)
             if path is None:
                 raise KeyError(name)
-            for (_, _, loader, suffix) in self._storage:
+            for (_, _, loader, suffix, kwargs) in self._storage:
                 if path.suffix == suffix:
-                    self._objects[name] = loader(path)
+                    self._objects[name] = loader(path, **kwargs)
         return self._objects[name]
 
     def __setitem__(self, name: str, value: Matrix):
@@ -89,7 +89,7 @@ class Snapshot:
             path = self.datapath
             if not path.exists():
                 raise FileNotFoundError(path)
-            self._data = np.load(path)
+            self._data = np.load(path, allow_pickle=False)
         return self._data
 
     @data.setter
