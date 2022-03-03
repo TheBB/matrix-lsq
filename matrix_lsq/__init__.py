@@ -106,7 +106,7 @@ class Storage(Protocol):
     def __getitem__(self, index: int) -> Snapshot:
         ...
 
-    def append(self, element: Snapshot):
+    def append(self, data: Optional[np.ndarray] = None, **kwargs: Matrix):
         ...
 
 
