@@ -9,15 +9,12 @@ import numpy as np
 import scipy.sparse as sp
 import tqdm
 
-
 __version__ = '0.1.0'
-
 
 Matrix = Union[np.ndarray, sp.spmatrix]
 
 
 class Snapshot:
-
     root: Path
 
     _data: Optional[np.ndarray]
@@ -110,9 +107,14 @@ class Storage(Protocol):
     def append(self, data: Optional[np.ndarray] = None, **kwargs: Matrix):
         ...
 
+    def pop(self, index: Optional[int] = None) -> Snapshot:
+        ...
+
+    def vipe(self):
+        ...
+
 
 class DiskStorage(Storage):
-
     root: Path
 
     def __init__(self, root: Path):
@@ -136,11 +138,42 @@ class DiskStorage(Storage):
         index = len(self)
         root = self.root_of(index)
         root.mkdir(parents=True, exist_ok=True)
-        return Snapshot(root, data, **kwargs)
+        Snapshot(root, data, **kwargs)
+
+    def pop(self, index: Optional[int] = None) -> Snapshot:
+        if index is None:
+            index = len(self) - 1
+        elif index > len(self) - 1:
+            raise IndexError("pop index out of range")
+        root = self.root_of(index)
+        snapshot = Snapshot(root)
+        for path in root.glob('*'):
+            path.unlink()
+        root.rmdir()
+        for index_i in range(index + 1, len(self) + 1):
+            root_i = self.root_of(index_i)
+            root_i_new = self.root_of(index_i - 1)
+            root_i.rename(root_i_new)
+        return snapshot
+
+    def vipe(self, user_confirm: Optional[bool] = True):
+        run_vipe = not user_confirm
+        if user_confirm:
+            user_input = str(input(f"Do you really want to vipe storage in \'{self.root}\'? This will delete all the "
+                                   f"files stored. y: "))
+            if user_input.lower() == "y":
+                run_vipe = True
+
+        if run_vipe:
+            for index in range(len(self)):
+                root = self.root_of(index)
+                for path in root.glob('*'):
+                    path.unlink()
+                root.rmdir()
+            self.root.rmdir()
 
 
 class LeastSquares:
-
     storage: Storage
 
     def __init__(self, storage: Storage):
