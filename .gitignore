@@ -132,9 +132,3 @@ dmypy.json
 .idea
 /storage
 /.vscode
-
-.gitignore
-pyproject.toml
-setup.py
-setup.cfg
-requirements.txt
