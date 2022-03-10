@@ -1,7 +1,7 @@
 from pathlib import Path
 from numpy.random import random
 
-from matrix_lsq import DiskStorage, LeastSquares
+from src.matrix_lsq import DiskStorage, LeastSquares
 
 
 def setup():

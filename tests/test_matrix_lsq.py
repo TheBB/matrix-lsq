@@ -1,4 +1,4 @@
-from matrix_lsq import __version__
+from src.matrix_lsq import __version__
 
 
 def test_version():
