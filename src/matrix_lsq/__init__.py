@@ -188,7 +188,7 @@ class LeastSquares:
 
         invdata = np.linalg.inv(sqrdata) @ rawdata.T
 
-        components = [0] * rawdata.shape[0]
+        components = [0] * rawdata.shape[1]
         for row, snapshot in tqdm.tqdm(zip(invdata.T, self.storage), desc='Interpolating'):
             obj = snapshot[name]
             for i, coeff in enumerate(row):
