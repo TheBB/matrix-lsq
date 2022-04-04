@@ -184,7 +184,7 @@ class LeastSquares:
         sqrdata = rawdata.T @ rawdata
 
         if (cond := np.linalg.cond(sqrdata)) > 1e5:
-            print(f"warning: data matrix may be ill conditioned: {cond}", file=sys.stderr)
+            print(f"warning: data matrix may be ill conditioned: {cond:.2e}", file=sys.stderr)
 
         invdata = np.linalg.inv(sqrdata) @ rawdata.T
 
