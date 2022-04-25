@@ -9,15 +9,12 @@ import numpy as np
 import scipy.sparse as sp
 import tqdm
 
-
 __version__ = '0.1.0'
-
 
 Matrix = Union[np.ndarray, sp.spmatrix]
 
 
 class Snapshot:
-
     root: Path
 
     _data: Optional[np.ndarray]
@@ -110,9 +107,11 @@ class Storage(Protocol):
     def append(self, data: Optional[np.ndarray] = None, **kwargs: Matrix):
         ...
 
+    def pop(self, index: Optional[int] = None) -> Snapshot:
+        ...
+
 
 class DiskStorage(Storage):
-
     root: Path
 
     def __init__(self, root: Path):
@@ -136,11 +135,26 @@ class DiskStorage(Storage):
         index = len(self)
         root = self.root_of(index)
         root.mkdir(parents=True, exist_ok=True)
-        return Snapshot(root, data, **kwargs)
+        Snapshot(root, data, **kwargs)
+
+    def pop(self, index: Optional[int] = None) -> Snapshot:
+        if index is None:
+            index = len(self) - 1
+        elif index > len(self) - 1:
+            raise IndexError("pop index out of range")
+        root = self.root_of(index)
+        snapshot = Snapshot(root)
+        for path in root.glob('*'):
+            path.unlink()
+        root.rmdir()
+        for index_i in range(index + 1, len(self) + 1):
+            root_i = self.root_of(index_i)
+            root_i_new = self.root_of(index_i - 1)
+            root_i.rename(root_i_new)
+        return snapshot
 
 
 class LeastSquares:
-
     storage: Storage
 
     def __init__(self, storage: Storage):
@@ -151,11 +165,11 @@ class LeastSquares:
         sqrdata = rawdata.T @ rawdata
 
         if (cond := np.linalg.cond(sqrdata)) > 1e5:
-            print(f"warning: data matrix may be ill conditioned: {cond}", file=sys.stderr)
+            print(f"warning: data matrix may be ill conditioned: {cond:.2e}", file=sys.stderr)
 
         invdata = np.linalg.inv(sqrdata) @ rawdata.T
 
-        components = [0] * rawdata.shape[0]
+        components = [0] * rawdata.shape[1]
         for row, snapshot in tqdm.tqdm(zip(invdata.T, self.storage), desc='Interpolating'):
             obj = snapshot[name]
             for i, coeff in enumerate(row):
