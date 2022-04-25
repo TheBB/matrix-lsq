@@ -110,9 +110,6 @@ class Storage(Protocol):
     def pop(self, index: Optional[int] = None) -> Snapshot:
         ...
 
-    def vipe(self):
-        ...
-
 
 class DiskStorage(Storage):
     root: Path
@@ -155,22 +152,6 @@ class DiskStorage(Storage):
             root_i_new = self.root_of(index_i - 1)
             root_i.rename(root_i_new)
         return snapshot
-
-    def vipe(self, user_confirm: Optional[bool] = True):
-        run_vipe = not user_confirm
-        if user_confirm:
-            user_input = str(input(f"Do you really want to vipe storage in \'{self.root}\'? This will delete all the "
-                                   f"files stored. y: "))
-            if user_input.lower() == "y":
-                run_vipe = True
-
-        if run_vipe:
-            for index in range(len(self)):
-                root = self.root_of(index)
-                for path in root.glob('*'):
-                    path.unlink()
-                root.rmdir()
-            self.root.rmdir()
 
 
 class LeastSquares:
