@@ -104,6 +104,9 @@ class Storage(Protocol):
     def __getitem__(self, index: int) -> Snapshot:
         ...
 
+    def __setitem__(self, index: int, value,  data: Optional[np.ndarray] = None, **kwargs: Matrix):
+        ...
+
     def append(self, data: Optional[np.ndarray] = None, **kwargs: Matrix):
         ...
 
@@ -126,6 +129,12 @@ class DiskStorage(Storage):
 
     def __getitem__(self, index: int) -> Snapshot:
         return Snapshot(self.root_of(index))
+
+    def __setitem__(self, index: int, value,  data: Optional[np.ndarray] = None, **kwargs: Matrix):
+        if index not in range(len(self)):
+            raise IndexError("storage index out of range")
+        root = self.root_of(index)
+        Snapshot(root, data, **kwargs)
 
     def __iter__(self) -> Iterable[Snapshot]:
         for index in range(len(self)):
