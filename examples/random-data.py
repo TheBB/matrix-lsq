@@ -74,6 +74,25 @@ def remove2():
     storage.pop()
     storage.pop(1)
 
+def fit3():
+    """Perform a least-squares fit on the data generated
+    by snapsnot(). Return a list of four 10x10 matrices
+    for the LHS and four 10-element vectors for the RHS.
+    """
+
+    storage = CompressedSnapshotDiskStorage(Path('storage'))
+    fitter = LeastSquares(storage)
+    return fitter('lhs'), fitter('rhs')
+
+
+def remove3():
+    """Remove some snapshots """
+    storage = CompressedSnapshotDiskStorage(Path('storage'))
+    assert len(storage) != 0
+
+    storage.pop()
+    storage.pop(1)
+
 
 setup()
 fit()
@@ -82,3 +101,6 @@ remove()
 setup2()
 fit2()
 remove2()
+
+fit3()
+remove3()
