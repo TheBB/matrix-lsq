@@ -96,6 +96,109 @@ class Snapshot:
         self.save_data()
 
 
+class CompressedSnapshot:
+    root: Path
+    _data: Optional[np.ndarray]
+    _numpy_objects: Dict[str, np.ndarray]
+    _sparse_objects: Dict[str, sp.spmatrix]
+
+    def __init__(self, root: Path, data: Optional[np.ndarray] = None, **kwargs: Matrix):
+        self.root = root
+        self._data = data
+        self._numpy_objects = {}
+        self._sparse_objects = {}
+        if data is not None:
+            self.save_data()
+        for name, obj in kwargs.items():
+            if isinstance(obj, sp.spmatrix):
+                self._sparse_objects[name] = obj
+                self.save_sparse_object(name)
+            elif isinstance(obj, np.ndarray):
+                self._numpy_objects[name] = obj
+        if len(self._numpy_objects) != 0:
+            self.save_numpy_objects()
+
+    @property
+    def datapath(self) -> Path:
+        if not self.root:
+            raise ValueError("set root first")
+        return self.root / 'data.npz'
+
+    def sparse_objpath_root(self, name: str) -> Path:
+        if not self.root:
+            raise ValueError("set root first")
+        return self.root / f'sp-obj-{name}'
+
+    def existing_sparse_objpath(self, name: str) -> Optional[Path]:
+        rpath = self.sparse_objpath_root(name)
+        if (path := rpath.with_suffix(".npz")).exists():
+            return path
+        return None
+
+    def save_sparse_object(self, name: str):
+        if (path := self.existing_sparse_objpath(name)) is not None:
+            path.unlink()
+        obj = self._sparse_objects[name]
+        sp.save_npz(self.sparse_objpath_root(name).with_suffix(".npz"), obj)
+
+    def numpy_objpath_root(self) -> Path:
+        if not self.root:
+            raise ValueError("set root first")
+        return self.root / f'np-obj'
+
+    def existing_numpy_objpath(self) -> Optional[Path]:
+        rpath = self.numpy_objpath_root()
+        if (path := rpath.with_suffix(".npz")).exists():
+            return path
+        return None
+
+    def save_numpy_objects(self):
+        if (path := self.existing_numpy_objpath()) is not None:
+            path.unlink()
+        # save all numpy objects (arrays) to compressed npz file (zip file)
+        # Note: we all save pickle data here, but we will not allow loading it in getitem.
+        np.savez(self.numpy_objpath_root().with_suffix(".npz"), **self._numpy_objects)
+
+    def save_data(self):
+        if (path := self.datapath).exists():
+            path.unlink()
+        if self._data is None:
+            return
+        # Note: we all save pickle data here, but we will not allow loading it in getitem.
+        np.savez_compressed(self.datapath, data=self._data)
+
+    def __getitem__(self, name: str) -> Matrix:
+        # start checking in sparse objects
+        if name not in self._sparse_objects:
+            path = self.existing_sparse_objpath(name)
+            if path is not None:
+                self._sparse_objects[name] = sp.load_npz(path)
+        if name not in self._numpy_objects:
+            path = self.existing_numpy_objpath()
+            if path is None:
+                raise KeyError(name)
+            self._numpy_objects[name] = np.load(path, allow_pickle=False)[name]
+
+        if name in self._sparse_objects:
+            return self._sparse_objects[name]
+        else:
+            return self._numpy_objects[name]
+
+    @property
+    def data(self) -> np.ndarray:
+        if self._data is None:
+            path = self.datapath
+            if not path.exists():
+                raise FileNotFoundError(path)
+            self._data = np.load(path, allow_pickle=False)["data"]
+        return self._data
+
+    @data.setter
+    def data(self, value: np.ndarray):
+        self._data = value
+        self.save_data()
+
+
 class Storage(Protocol):
 
     def __len__(self) -> int:
@@ -108,6 +211,21 @@ class Storage(Protocol):
         ...
 
     def pop(self, index: Optional[int] = None) -> Snapshot:
+        ...
+
+
+class CompressedStorage(Protocol):
+
+    def __len__(self) -> int:
+        ...
+
+    def __getitem__(self, index: int) -> CompressedSnapshot:
+        ...
+
+    def append(self, data: Optional[np.ndarray] = None, **kwargs: Matrix):
+        ...
+
+    def pop(self, index: Optional[int] = None) -> CompressedSnapshot:
         ...
 
 
@@ -154,10 +272,53 @@ class DiskStorage(Storage):
         return snapshot
 
 
-class LeastSquares:
-    storage: Storage
+class CompressedSnapshotDiskStorage(CompressedStorage):
+    root: Path
 
-    def __init__(self, storage: Storage):
+    def __init__(self, root: Path):
+        self.root = root
+        root.mkdir(parents=True, exist_ok=True)
+
+    def root_of(self, index: int) -> Path:
+        return self.root / f'object-{index}'
+
+    def __len__(self) -> int:
+        return sum(1 for _ in self.root.glob('object-*'))
+
+    def __getitem__(self, index: int) -> CompressedSnapshot:
+        return CompressedSnapshot(self.root_of(index))
+
+    def __iter__(self) -> Iterable[CompressedSnapshot]:
+        for index in range(len(self)):
+            yield self[index]
+
+    def append(self, data: Optional[np.ndarray] = None, **kwargs: Matrix):
+        index = len(self)
+        root = self.root_of(index)
+        root.mkdir(parents=True, exist_ok=True)
+        CompressedSnapshot(root, data, **kwargs)
+
+    def pop(self, index: Optional[int] = None) -> CompressedSnapshot:
+        if index is None:
+            index = len(self) - 1
+        elif index > len(self) - 1:
+            raise IndexError("pop index out of range")
+        root = self.root_of(index)
+        snapshot = CompressedSnapshot(root)
+        for path in root.glob('*'):
+            path.unlink()
+        root.rmdir()
+        for index_i in range(index + 1, len(self) + 1):
+            root_i = self.root_of(index_i)
+            root_i_new = self.root_of(index_i - 1)
+            root_i.rename(root_i_new)
+        return snapshot
+
+
+class LeastSquares:
+    storage: Union[Storage, CompressedStorage]
+
+    def __init__(self, storage: Union[Storage, CompressedStorage]):
         self.storage = storage
 
     def __call__(self, name: str) -> List[Matrix]:
