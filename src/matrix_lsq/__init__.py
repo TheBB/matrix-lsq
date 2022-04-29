@@ -158,7 +158,7 @@ class CompressedSnapshot:
         if (path := self.existing_numpy_objpath()) is not None:
             path.unlink()
         # save all numpy objects (arrays) to compressed npz file (zip file)
-        # Note: we all save pickle data here, but we will not allow loading it in getitem.
+        # Note: we allow save pickle data here, but we will not allow loading it in getitem.
         np.savez_compressed(self.numpy_objpath_root().with_suffix(".npz"), **self._numpy_objects)
 
     def save_data(self):
@@ -166,7 +166,7 @@ class CompressedSnapshot:
             path.unlink()
         if self._data is None:
             return
-        # Note: we all save pickle data here, but we will not allow loading it in getitem.
+        # Note: we allow save pickle data here, but we will not allow loading it in getitem.
         np.savez_compressed(self.datapath, data=self._data)
 
     def _non_compressed_objpath_root(self, name: str) -> Path:
@@ -208,7 +208,7 @@ class CompressedSnapshot:
             self._sparse_objects[name] = value
             self.save_sparse_object(name)
         elif isinstance(value, np.ndarray):
-            print("Setitem for numpy-ndarrays is inefficient in compressed-format, "
+            print("warning: Setitem for numpy-ndarrays is inefficient in compressed-format, "
                   "due to needing to copy exiting data.", file=sys.stderr)
             # copy already saved data
             np_path = self.existing_numpy_objpath()
