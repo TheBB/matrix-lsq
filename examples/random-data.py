@@ -39,6 +39,7 @@ def remove():
     storage.pop()
     storage.pop(1)
 
+
 def setup2():
     """Setup a disk-based storage in the path 'storage',
     with twenty Compressedsnapshots, each with a 10x10 random lhs
@@ -74,6 +75,7 @@ def remove2():
     storage.pop()
     storage.pop(1)
 
+
 def fit3():
     """Perform a least-squares fit on the data generated
     by snapsnot(). Return a list of four 10x10 matrices
@@ -94,13 +96,32 @@ def remove3():
     storage.pop(1)
 
 
-setup()
-fit()
-remove()
+def vipe1():
+    """Vipe storage"""
+    storage = DiskStorage(Path("storage"))
+    assert len(storage) != 0
 
-setup2()
-fit2()
-remove2()
+    storage.vipe()
 
-fit3()
-remove3()
+def vipe2():
+    """Vipe storage2"""
+    storage = CompressedSnapshotDiskStorage(Path("storage2"))
+    assert len(storage) != 0
+
+    storage.vipe()
+
+
+if __name__ == "__main__":
+    setup()
+    fit()
+    remove()
+
+    setup2()
+    fit2()
+    remove2()
+
+    fit3()
+    remove3()
+
+    vipe1()
+    vipe2()
